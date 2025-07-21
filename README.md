@@ -9,7 +9,16 @@
 [![Discord][discord-shield]][discord]
 [![Community Forum][forum-shield]][forum]
 
-*Integration for **[Atomberg smart fans](https://atomberg.com/atomberg-ceiling-fans/smart-fans)***
+*Home Assistant integration for **[Atomberg smart fans](https://atomberg.com/atomberg-ceiling-fans/smart-fans)** with **local control support***
+
+## ✨ Features
+
+- **🚀 Local Control**: Direct communication with fans for instant response (HTTP + UDP fallback)
+- **☁️ Cloud Integration**: Full Atomberg cloud API support with automatic fallback
+- **⚡ Real-time Updates**: UDP state broadcasts for immediate status updates  
+- **🎛️ Full Device Control**: Fan speed, lighting, timers, sleep mode, and more
+- **🔧 Advanced Features**: Brightness control and color effects for supported models (I1 series)
+- **🏠 Home Assistant Integration**: Native entities for fans, lights, sensors, switches, and selects
 
 ## Tested on
 - **[Atomberg Renesa+ Ceiling Fan](https://atomberg.com/atomberg-renesa-smart-iot-enabled-ceiling-fans-with-bldc-motor-and-remote)**
@@ -47,24 +56,108 @@
 3. Click the "+" icon to add a new integration.
 4. Search for "Atomberg" in the integration search bar and select it.
 
-### Step 3: Enter API Key and Refresh Token
+### Step 3: Configure Integration Settings
 1. Enter your `api_key` and `refresh_token` in the appropriate fields.
-2. Submit the form.
+2. **Enable Local Control** (recommended): Keep this checked for optimal performance and instant response times.
+3. Submit the form.
 
-## Compatibility and Requirements
+#### Local Control Options
+- **✅ Enabled (Default)**: Uses local HTTP/UDP communication for faster commands with cloud fallback
+- **❌ Disabled**: Uses only cloud API communication (slower but works without local network access)
 
-- Please note that this integration is designed for the latest series of Atomberg fans and may not work with older models.
-- The integration relies on cloud APIs for communication with your Atomberg fans.
-- This integration uses UDP port `5625` for updating the fan state locally, make sure that port is not in use by any other application and that it is not blocked by any firewall.
+## 📋 Compatibility and Requirements
+
+### Supported Devices
+- **Latest Atomberg Smart Fans**: Designed for current-generation models
+- **I1 Series**: Full feature support including brightness control and color effects
+- **Older Models**: May have limited functionality
+
+### Communication Methods
+The integration uses a **hybrid approach** for optimal performance:
+
+1. **🏠 Local HTTP Control** (Primary): Direct HTTP commands to device IP
+2. **📡 Legacy UDP Control** (Fallback): Direct UDP commands to device IP  
+3. **☁️ Cloud API** (Final Fallback): Commands via Atomberg cloud servers
+
+### Network Requirements
+
+#### Required Ports
+- **UDP Port 5625** (Inbound): Device state broadcasts - **must be open on firewall**
+- **HTTP Port 80** (Outbound): Local device control
+- **UDP Port 5600** (Outbound): Legacy local control
+- **HTTPS Port 443** (Outbound): Cloud API communication
+
+#### Network Setup
+- **Local Network**: Devices must be on the same network as Home Assistant for local control
+- **Internet Access**: Required for initial setup and cloud API fallback
+- **Firewall**: Ensure UDP port 5625 is not blocked
+
+## 🚀 Performance & Benefits
+
+### Local Control Advantages
+- **⚡ Instant Response**: Commands execute immediately without cloud latency
+- **🔄 Automatic Fallback**: Seamlessly switches to cloud if local communication fails  
+- **📡 Real-time Updates**: UDP broadcasts provide immediate state synchronization
+- **🌐 Works Offline**: Local control functions even when internet is unavailable
+- **🔧 Smart Routing**: Integration automatically chooses the fastest available method
+
+### Device Entities
+The integration creates the following Home Assistant entities for each fan:
+
+- **🌀 Fan Entity**: Speed control (1-6), power on/off
+- **💡 Light Entity**: LED control with brightness and color temperature (I1 series)
+- **🔄 Switch Entity**: Sleep mode toggle
+- **⏰ Select Entity**: Timer control (Off, 1h, 2h, 3h, 6h)
+- **📊 Sensor Entity**: Timer elapsed time with dynamic icons
+
+## 🔧 Troubleshooting
+
+### Local Control Issues
+1. **Commands not working locally**:
+   - Verify devices are on same network as Home Assistant
+   - Check firewall settings for UDP port 5625
+   - Try disabling and re-enabling local control in integration settings
+
+2. **Slow response times**:
+   - Enable local control if disabled
+   - Check network connectivity between Home Assistant and fan devices
+   - Monitor Home Assistant logs for connection issues
+
+3. **Fan not discovered**:
+   - Ensure API key and refresh token are correct
+   - Verify fan is connected to Atomberg cloud via mobile app
+   - Restart Home Assistant after fan setup
+
+### Debug Logging
+Add this to your `configuration.yaml` for detailed logging:
+```yaml
+logger:
+  default: info
+  logs:
+    custom_components.atomberg: debug
+```
 
 ## Contributions are welcome!
 
 If you want to contribute to this please read the [Contribution guidelines](CONTRIBUTING.md)
 
+## 📝 Changelog
+
+### Version 2.0.0
+- ✨ **NEW**: Local control support with HTTP API
+- ✨ **NEW**: Multi-tier communication with intelligent fallback (HTTP → UDP → Cloud)
+- ✨ **NEW**: Configuration option to enable/disable local control
+- 🚀 **IMPROVED**: Faster response times with local communication
+- 🚀 **IMPROVED**: Better reliability with multiple fallback methods
+- 🔧 **IMPROVED**: Enhanced error handling and validation
+- 🔧 **IMPROVED**: IP address validation for security
+- 📝 **IMPROVED**: Comprehensive logging for troubleshooting
+
 ## Credits
 
 - Code template was mainly taken from [@Ludeeus](https://github.com/ludeeus)'s [integration_blueprint][integration_blueprint] template
-- Atomberg IoT Team
+- Atomberg IoT Team for providing the device APIs and local control features
+- Home Assistant community for feedback and testing
 
 
 [integration_blueprint]: https://github.com/ludeeus/integration_blueprint

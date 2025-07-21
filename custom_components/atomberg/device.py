@@ -9,6 +9,7 @@ from typing import Any
 from homeassistant.components.light import ATTR_BRIGHTNESS
 
 from .api import AtombergCloudAPI
+from .const import LOCAL_CONTROL_UDP_PORT
 
 _LOGGER = getLogger(__name__)
 
@@ -112,29 +113,52 @@ class AtombergDevice:
             self._ip_addr = value
 
     async def async_send_command(self, command: dict) -> bool:
-        """Send command to the device."""
-        if self.ip_address:
-            message = json.dumps(command).encode()
-            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-                sent_bytes = sock.sendto(message, (self.ip_address, 5600))
-                res = sent_bytes > 0
-                if res:
-                    _LOGGER.debug(
-                        "Command sent to %s (%s): %s",
-                        self.name,
-                        self.ip_address,
-                        command,
-                    )
-                else:
-                    _LOGGER.error(
-                        "Failed to send command to %s (%s): %s",
-                        self.name,
-                        self.ip_address,
-                        command,
-                    )
-                return res
+        """Send command to the device with local control priority."""
+        if self.ip_address and self._api.local_control_enabled:
+            # Priority 1: Try local HTTP API (new local control feature)
+            if await self._api.async_send_local_command(self.ip_address, command):
+                _LOGGER.debug(
+                    "Local HTTP command sent to %s (%s): %s",
+                    self.name,
+                    self.ip_address,
+                    command,
+                )
+                return True
+            
+            # Priority 2: Fallback to direct UDP command (legacy local control)
+            try:
+                message = json.dumps(command).encode()
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                    sent_bytes = sock.sendto(message, (self.ip_address, LOCAL_CONTROL_UDP_PORT))
+                    if sent_bytes > 0:
+                        _LOGGER.debug(
+                            "UDP command sent to %s (%s): %s",
+                            self.name,
+                            self.ip_address,
+                            command,
+                        )
+                        return True
+                    else:
+                        _LOGGER.warning(
+                            "UDP command failed to %s (%s): %s",
+                            self.name,
+                            self.ip_address,
+                            command,
+                        )
+            except (OSError, socket.error) as e:
+                _LOGGER.warning(
+                    "UDP command error to %s (%s): %s",
+                    self.name,
+                    self.ip_address,
+                    e,
+                )
+        
+        # Priority 3: Fallback to cloud API
+        if self.ip_address and not self._api.local_control_enabled:
+            _LOGGER.debug("Local control disabled, using cloud API for %s", self.name)
         else:
-            return self._api.async_send_command(self.id, command)
+            _LOGGER.debug("Using cloud API fallback for %s", self.name)
+        return await self._api.async_send_command(self.id, command)
 
     async def async_turn_on(self):
         """Turn on."""
