@@ -13,13 +13,14 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 
 from .api import AtombergCloudAPI
-from .const import CONF_REFRESH_TOKEN, DOMAIN
+from .const import CONF_ENABLE_LOCAL_CONTROL, CONF_REFRESH_TOKEN, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_API_KEY): cv.string,
         vol.Required(CONF_REFRESH_TOKEN): cv.string,
+        vol.Optional(CONF_ENABLE_LOCAL_CONTROL, default=True): cv.boolean,
     }
 )
 
@@ -28,8 +29,9 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     """Validate the user input allows us to connect."""
     api_key = data["api_key"]
     refresh_token = data["refresh_token"]
+    enable_local_control = data.get("enable_local_control", True)
 
-    api = AtombergCloudAPI(hass, api_key, refresh_token)
+    api = AtombergCloudAPI(hass, api_key, refresh_token, enable_local_control)
 
     if not await api.test_connection():
         raise CannotConnect

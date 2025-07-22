@@ -2,6 +2,7 @@
 
 import datetime
 import functools
+import ipaddress
 from copy import deepcopy
 from logging import getLogger
 from typing import Literal
@@ -12,19 +13,28 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util.dt import utcnow
 from requests import Response
 
+from .const import LOCAL_CONTROL_HTTP_TIMEOUT
+
 _LOGGER = getLogger(__name__)
 
 
 class AtombergCloudAPI:
     """Atomberg CloudAPI."""
 
-    def __init__(self, hass: HomeAssistant, api_key: str, refresh_token: str) -> None:
+    def __init__(
+        self, 
+        hass: HomeAssistant, 
+        api_key: str, 
+        refresh_token: str, 
+        enable_local_control: bool = True
+    ) -> None:
         """Init Atomberg CloudAPI."""
         self._hass = hass
         self._base_url = "https://api.developer.atomberg-iot.com"
         self._api_key = api_key
         self._refresh_token = refresh_token
         self._access_token = None
+        self._enable_local_control = enable_local_control
         self.device_list: dict[str, dict] = {}
 
     async def test_connection(self):
@@ -163,3 +173,58 @@ class AtombergCloudAPI:
         resp = await self.async_make_request("/v1/send_command", "POST", body=payload)
         data = resp.json()
         return data["status"] == "Success"
+
+    async def async_send_local_command(self, device_ip: str, command: dict) -> bool:
+        """Send command to device using local HTTP API."""
+        if not device_ip or not self._enable_local_control:
+            return False
+        
+        # Basic IP validation to prevent URL injection
+        try:
+            ipaddress.ip_address(device_ip)
+        except ValueError:
+            _LOGGER.warning("Invalid device IP format: %s", device_ip)
+            return False
+            
+        local_url = f"http://{device_ip}/v1/send_command"
+        headers = {
+            "Content-Type": "application/json",
+            "X-API-Key": self._api_key,
+        }
+        
+        try:
+            _LOGGER.debug("Sending local HTTP command to %s: %s", device_ip, command)
+            func = functools.partial(
+                requests.post,
+                local_url,
+                headers=headers,
+                json={"command": command},
+                timeout=LOCAL_CONTROL_HTTP_TIMEOUT,
+            )
+            
+            resp = await self._hass.async_add_executor_job(func)
+            
+            if resp.ok:
+                try:
+                    data = resp.json()
+                    success = data.get("status") == "Success"
+                    if success:
+                        _LOGGER.debug("Local HTTP command successful to %s", device_ip)
+                    else:
+                        _LOGGER.warning("Local HTTP command failed to %s: %s", device_ip, data.get("message"))
+                    return success
+                except (ValueError, UnicodeDecodeError) as json_err:
+                    _LOGGER.warning("Local HTTP response invalid JSON from %s: %s", device_ip, json_err)
+                    return False
+            else:
+                _LOGGER.warning("Local HTTP request failed to %s: %s", device_ip, resp.status_code)
+                return False
+                
+        except (requests.exceptions.RequestException, requests.exceptions.Timeout) as e:
+            _LOGGER.debug("Local HTTP command failed to %s: %s", device_ip, e)
+            return False
+
+    @property
+    def local_control_enabled(self) -> bool:
+        """Check if local control is enabled."""
+        return self._enable_local_control

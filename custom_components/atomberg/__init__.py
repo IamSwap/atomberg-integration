@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 
 from .api import AtombergCloudAPI
-from .const import CONF_REFRESH_TOKEN, DOMAIN
+from .const import CONF_ENABLE_LOCAL_CONTROL, CONF_REFRESH_TOKEN, DOMAIN
 from .coordinator import AtombergDataUpdateCoordinator
 from .udp_listener import UDPListener
 
@@ -26,7 +26,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})
     api = AtombergCloudAPI(
-        hass, entry.data[CONF_API_KEY], entry.data[CONF_REFRESH_TOKEN]
+        hass, 
+        entry.data[CONF_API_KEY], 
+        entry.data[CONF_REFRESH_TOKEN],
+        entry.data.get(CONF_ENABLE_LOCAL_CONTROL, True)
     )
 
     # Test API connection
